@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "139120870100",
+    "project_id": "smart-grocery-price-comparator",
+    "storage_bucket": "smart-grocery-price-comparator.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:139120870100:android:f1a0643510d016456bf141",
+        "android_client_info": {
+          "package_name": "com.example.grocery_compare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCe9rbKrY4fZNII7Mk4pF5jkkCeD_G0Z_w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
