@@ -1,6 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyCe9rbKrY4fZNII7Mk4pF5jkkCeD_G0Z_w",
+      authDomain: "smart-grocery-price-comparator.firebaseapp.com",
+      projectId: "smart-grocery-price-comparator",
+      storageBucket: "smart-grocery-price-comparator.firebasestorage.app",
+      messagingSenderId: "139120870100",
+      appId: "1:139120870100:android:f1a0643510d016456bf141",
+    ),
+  );
   runApp(const GroceryApp());
 }
 
@@ -16,25 +31,119 @@ class GroceryApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const AuthWrapper(),
     );
   }
 }
 
-const List<Map<String, dynamic>> groceryItems = [
-  {'name': 'Rice (1kg)', 'category': 'Grains', 'prices': {'Nilgiris': 55, 'Subramanian Stores': 49, 'Big Bazaar': 52}},
-  {'name': 'Milk (1L)', 'category': 'Dairy', 'prices': {'Nilgiris': 28, 'Subramanian Stores': 25, 'Big Bazaar': 27}},
-  {'name': 'Eggs (12)', 'category': 'Dairy', 'prices': {'Nilgiris': 72, 'Subramanian Stores': 68, 'Big Bazaar': 70}},
-  {'name': 'Bread', 'category': 'Bakery', 'prices': {'Nilgiris': 40, 'Subramanian Stores': 35, 'Big Bazaar': 38}},
-  {'name': 'Oil (1L)', 'category': 'Cooking', 'prices': {'Nilgiris': 130, 'Subramanian Stores': 120, 'Big Bazaar': 125}},
-  {'name': 'Sugar (1kg)', 'category': 'Grains', 'prices': {'Nilgiris': 45, 'Subramanian Stores': 42, 'Big Bazaar': 44}},
-  {'name': 'Dal (1kg)', 'category': 'Grains', 'prices': {'Nilgiris': 110, 'Subramanian Stores': 100, 'Big Bazaar': 105}},
-  {'name': 'Tomato (1kg)', 'category': 'Vegetables', 'prices': {'Nilgiris': 30, 'Subramanian Stores': 25, 'Big Bazaar': 28}},
-  {'name': 'Onion (1kg)', 'category': 'Vegetables', 'prices': {'Nilgiris': 35, 'Subramanian Stores': 30, 'Big Bazaar': 32}},
-  {'name': 'Potato (1kg)', 'category': 'Vegetables', 'prices': {'Nilgiris': 28, 'Subramanian Stores': 24, 'Big Bazaar': 26}},
-  {'name': 'Butter (100g)', 'category': 'Dairy', 'prices': {'Nilgiris': 55, 'Subramanian Stores': 50, 'Big Bazaar': 52}},
-  {'name': 'Salt (1kg)', 'category': 'Cooking', 'prices': {'Nilgiris': 20, 'Subramanian Stores': 18, 'Big Bazaar': 19}},
-];
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool isLoading = false;
+
+  Future<void> signInWithGoogle() async {
+    setState(() => isLoading = true);
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: "139120870100-5vp0uv2jpen2lm27ilkm3jmjlhu8ugh1.apps.googleusercontent.com",
+      );
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      setState(() => isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign in failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade700, Colors.green.shade400],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.shopping_cart, size: 100, color: Colors.white),
+                const SizedBox(height: 24),
+                const Text('Smart Grocery Compare',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 8),
+                const Text('Find best prices near you',
+                    style: TextStyle(fontSize: 16, color: Colors.white70)),
+                const SizedBox(height: 60),
+                isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : ElevatedButton.icon(
+                        onPressed: signInWithGoogle,
+                        icon: const Icon(Icons.login, color: Colors.red),
+                        label: const Text('Sign in with Google',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          minimumSize: const Size(double.infinity, 55),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                const SizedBox(height: 24),
+                const Text('Compare grocery prices across\nneighbourhood stores in Chennai',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 List<Map<String, dynamic>> cartItems = [];
 
@@ -46,6 +155,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final user = FirebaseAuth.instance.currentUser;
+
+  Future<void> signOut() async {
+    await GoogleSignIn().signOut();
+    await FirebaseAuth.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -55,6 +171,13 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: signOut,
+            tooltip: 'Sign Out',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -73,22 +196,18 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Find Best Grocery Prices',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+                  Text('Hello, ${user?.displayName?.split(' ').first ?? 'User'}! 👋',
+                      style: const TextStyle(fontSize: 18, color: Colors.white70)),
+                  const SizedBox(height: 4),
+                  const Text('Find Best Grocery Prices',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Compare prices across neighbourhood stores in Chennai',
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
-                  ),
+                  const Text('Compare prices across neighbourhood stores in Chennai',
+                      style: TextStyle(fontSize: 14, color: Colors.white70)),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
                     child: const Row(
                       children: [
                         Icon(Icons.search, color: Colors.grey),
@@ -124,13 +243,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(color: Colors.green.shade600, borderRadius: BorderRadius.circular(16)),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.compare_arrows, color: Colors.white, size: 36),
-                            SizedBox(height: 8),
-                            Text('Compare\nPrices', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                        child: const Column(children: [
+                          Icon(Icons.compare_arrows, color: Colors.white, size: 36),
+                          SizedBox(height: 8),
+                          Text('Compare\nPrices', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ]),
                       ),
                     ),
                   ),
@@ -141,13 +258,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(color: Colors.orange.shade600, borderRadius: BorderRadius.circular(16)),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.shopping_cart, color: Colors.white, size: 36),
-                            SizedBox(height: 8),
-                            Text('My\nCart', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                        child: const Column(children: [
+                          Icon(Icons.shopping_cart, color: Colors.white, size: 36),
+                          SizedBox(height: 8),
+                          Text('My\nCart', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ]),
                       ),
                     ),
                   ),
@@ -158,13 +273,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(color: Colors.blue.shade600, borderRadius: BorderRadius.circular(16)),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.store, color: Colors.white, size: 36),
-                            SizedBox(height: 8),
-                            Text('Nearby\nStores', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                        child: const Column(children: [
+                          Icon(Icons.store, color: Colors.white, size: 36),
+                          SizedBox(height: 8),
+                          Text('Nearby\nStores', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ]),
                       ),
                     ),
                   ),
@@ -177,45 +290,54 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text('Today\'s Best Deals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 130,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: groceryItems.length,
-                itemBuilder: (context, index) {
-                  final item = groceryItems[index];
-                  final prices = Map<String, int>.from(item['prices'] as Map);
-                  final minPrice = prices.values.reduce((a, b) => a < b ? a : b);
-                  final minStore = prices.entries.firstWhere((e) => e.value == minPrice).key;
-                  return Container(
-                    width: 130,
-                    margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 8)],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        const SizedBox(height: 6),
-                        Text('Best: Rs.$minPrice', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text('at $minStore', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8)),
-                          child: const Text('View Deal', style: TextStyle(color: Colors.green, fontSize: 11)),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('groceries').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final items = snapshot.data!.docs;
+                return SizedBox(
+                  height: 130,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final data = items[index].data() as Map<String, dynamic>;
+                      final balayya = (data['balayya'] ?? 0) as int;
+                      final saiRam = (data['sai RAM'] ?? 0) as int;
+                      final mediumBazzer = (data['medium Bazzer'] ?? 0) as int;
+                      final minPrice = [balayya, saiRam, mediumBazzer].reduce((a, b) => a < b ? a : b);
+                      final minStore = balayya == minPrice ? 'Balayya' : saiRam == minPrice ? 'Sai RAM' : 'Medium Bazzer';
+                      return Container(
+                        width: 130,
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 8)],
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(data['Name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            Text('Best: Rs.$minPrice', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text('at $minStore', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8)),
+                              child: const Text('View Deal', style: TextStyle(color: Colors.green, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             Padding(
@@ -265,9 +387,6 @@ class _CompareScreenState extends State<CompareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = groceryItems.where((item) =>
-        (item['name'] as String).toLowerCase().contains(searchQuery.toLowerCase())).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compare Prices'),
@@ -291,81 +410,94 @@ class _CompareScreenState extends State<CompareScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final item = filtered[index];
-                final prices = Map<String, int>.from(item['prices'] as Map);
-                final minPrice = prices.values.reduce((a, b) => a < b ? a : b);
-                final maxPrice = prices.values.reduce((a, b) => a > b ? a : b);
-                final savings = maxPrice - minPrice;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('groceries').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final items = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return (data['Name'] ?? '').toString().toLowerCase().contains(searchQuery.toLowerCase());
+                }).toList();
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final data = items[index].data() as Map<String, dynamic>;
+                    final balayya = (data['balayya'] ?? 0) as int;
+                    final saiRam = (data['sai RAM'] ?? 0) as int;
+                    final mediumBazzer = (data['medium Bazzer'] ?? 0) as int;
+                    final prices = {'Balayya': balayya, 'Sai RAM': saiRam, 'Medium Bazzer': mediumBazzer};
+                    final minPrice = prices.values.reduce((a, b) => a < b ? a : b);
+                    final maxPrice = prices.values.reduce((a, b) => a > b ? a : b);
+                    final savings = maxPrice - minPrice;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(8)),
-                              child: Text('Save Rs.$savings', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(data['Name'] ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(8)),
+                                  child: Text('Save Rs.$savings', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ...prices.entries.map((e) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(children: [
+                                        Icon(Icons.store, size: 16, color: e.value == minPrice ? Colors.green : Colors.grey),
+                                        const SizedBox(width: 6),
+                                        Text(e.key, style: const TextStyle(fontSize: 14)),
+                                      ]),
+                                      Row(children: [
+                                        Text('Rs.${e.value}',
+                                            style: TextStyle(
+                                                fontSize: 15,
+                                                color: e.value == minPrice ? Colors.green : Colors.black87,
+                                                fontWeight: e.value == minPrice ? FontWeight.bold : FontWeight.normal)),
+                                        if (e.value == minPrice)
+                                          const Text('  ✓ Best', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ]),
+                                    ],
+                                  ),
+                                )),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() => cartItems.add(Map<String, dynamic>.from(data)));
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text('${data['Name']} added to cart!'),
+                                    backgroundColor: Colors.green,
+                                  ));
+                                },
+                                icon: const Icon(Icons.add_shopping_cart),
+                                label: const Text('Add to Cart'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        ...prices.entries.map((e) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(children: [
-                                    Icon(Icons.store, size: 16, color: e.value == minPrice ? Colors.green : Colors.grey),
-                                    const SizedBox(width: 6),
-                                    Text(e.key, style: const TextStyle(fontSize: 14)),
-                                  ]),
-                                  Row(children: [
-                                    Text('Rs.${e.value}',
-                                        style: TextStyle(
-                                            fontSize: 15,
-                                            color: e.value == minPrice ? Colors.green : Colors.black87,
-                                            fontWeight: e.value == minPrice ? FontWeight.bold : FontWeight.normal)),
-                                    if (e.value == minPrice)
-                                      const Text('  ✓ Best', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ]),
-                                ],
-                              ),
-                            )),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              setState(() => cartItems.add(Map<String, dynamic>.from(item)));
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text('${item['name']} added to cart!'),
-                                backgroundColor: Colors.green,
-                              ));
-                            },
-                            icon: const Icon(Icons.add_shopping_cart),
-                            label: const Text('Add to Cart'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -381,12 +513,11 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, int> storeTotals = {'Nilgiris': 0, 'Subramanian Stores': 0, 'Big Bazaar': 0};
+    final Map<String, int> storeTotals = {'Balayya': 0, 'Sai RAM': 0, 'Medium Bazzer': 0};
     for (var item in cartItems) {
-      final prices = Map<String, int>.from(item['prices'] as Map);
-      prices.forEach((store, price) {
-        storeTotals[store] = (storeTotals[store] ?? 0) + price;
-      });
+      storeTotals['Balayya'] = storeTotals['Balayya']! + ((item['balayya'] ?? 0) as int);
+      storeTotals['Sai RAM'] = storeTotals['Sai RAM']! + ((item['sai RAM'] ?? 0) as int);
+      storeTotals['Medium Bazzer'] = storeTotals['Medium Bazzer']! + ((item['medium Bazzer'] ?? 0) as int);
     }
     final cheapest = storeTotals.entries.reduce((a, b) => a.value < b.value ? a : b).key;
     final mostExpensive = storeTotals.entries.reduce((a, b) => a.value > b.value ? a : b).key;
@@ -422,8 +553,10 @@ class CartScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.savings, color: Colors.green, size: 28),
                         const SizedBox(width: 12),
-                        Text('You can save Rs.$savings by shopping at $cheapest!',
-                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text('You can save Rs.$savings by shopping at $cheapest!',
+                              style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                        ),
                       ],
                     ),
                   ),
@@ -435,7 +568,7 @@ class CartScreen extends StatelessWidget {
                       return Card(
                         child: ListTile(
                           leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.check, color: Colors.white)),
-                          title: Text(cartItems[index]['name'] as String),
+                          title: Text(cartItems[index]['Name'] ?? ''),
                           trailing: const Icon(Icons.drag_handle, color: Colors.grey),
                         ),
                       );
@@ -490,9 +623,9 @@ class MapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stores = [
-      {'name': 'Nilgiris', 'address': 'Anna Nagar, Chennai', 'distance': '0.5 km', 'color': Colors.green},
-      {'name': 'Subramanian Stores', 'address': 'T Nagar, Chennai', 'distance': '1.2 km', 'color': Colors.orange},
-      {'name': 'Big Bazaar', 'address': 'Vadapalani, Chennai', 'distance': '2.1 km', 'color': Colors.blue},
+      {'name': 'Balayya', 'address': 'Anna Nagar, Chennai', 'distance': '0.5 km', 'color': Colors.green},
+      {'name': 'Sai RAM', 'address': 'T Nagar, Chennai', 'distance': '1.2 km', 'color': Colors.orange},
+      {'name': 'Medium Bazzer', 'address': 'Vadapalani, Chennai', 'distance': '2.1 km', 'color': Colors.blue},
     ];
 
     return Scaffold(
@@ -506,15 +639,26 @@ class MapScreen extends StatelessWidget {
           Container(
             height: 200,
             width: double.infinity,
-            color: Colors.blue.shade50,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade300, Colors.blue.shade600],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.map, size: 60, color: Colors.blue),
+                  Icon(Icons.location_on, size: 50, color: Colors.white),
                   SizedBox(height: 8),
-                  Text('Chennai, Tamil Nadu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('Google Maps - Coming Soon', style: TextStyle(color: Colors.grey)),
+                  Text('Chennai, Tamil Nadu',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                  SizedBox(height: 4),
+                  Text('3 stores found nearby', style: TextStyle(color: Colors.white70)),
+                  SizedBox(height: 12),
+                  Text('📍 Your location detected',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -535,6 +679,7 @@ class MapScreen extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: store['color'] as Color,
@@ -545,7 +690,8 @@ class MapScreen extends StatelessWidget {
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(store['distance'] as String, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                        Text(store['distance'] as String,
+                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                         const Text('away', style: TextStyle(color: Colors.grey, fontSize: 11)),
                       ],
                     ),
